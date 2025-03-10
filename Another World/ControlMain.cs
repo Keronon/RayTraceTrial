@@ -1,41 +1,65 @@
-﻿using SFML.Graphics;
-using SFML.System;
+﻿using SFML.System;
 using SFML.Window;
+using SFML.Graphics;
 
 namespace Another_World
 {
     internal class ControlMain
     {
-        public static int Run(CancellationToken token)
-        {
-            int w                  = 1920;
-            int h                  = 1080;
-            int mouseX             = w / 2;
-            int mouseY             = h / 2;
-            float mouseSensitivity = 3.0f;
-            float speed            = 0.1f;
-            bool mouseHidden       = true;
-            bool[] wasdUD          = new bool[6];
-            Vector3f pos           = new(-5.0f, 0.0f, 0.0f);
-            Clock clock            = new();
-            int framesStill        = 1;
+        private ControlMain() { }
 
-            RenderWindow window = new(new VideoMode((uint)w, (uint)h), "Ray tracing", Styles.Titlebar | Styles.Close);
+        private const int w = 1920;
+        private const int h = 1080;
+
+        private static int      mouseX;
+        private static int      mouseY;
+        private static bool     mouseHidden;
+        private static float    mouseSensitivity;
+        private static float    speed;
+        private static Vector3f pos;
+        private static int      framesStill;
+
+        private static RenderTexture firstTexture;
+        private static Sprite        firstTextureSprite;
+        private static Sprite        firstTextureSpriteFlipped;
+        private static RenderTexture outputTexture;
+        private static Sprite        outputTextureSprite;
+        private static Sprite        outputTextureSpriteFlipped;
+
+        private static readonly bool[] wasdUD;
+        private static readonly Clock clock;
+        private static readonly RenderWindow window;
+        private static readonly Shader shader;
+        private static readonly Random random;
+
+        static ControlMain()
+        {
+            mouseX           = w / 2;
+            mouseY           = h / 2;
+            mouseHidden      = true;
+            mouseSensitivity = 3.0f;
+            speed            = 0.1f;
+            pos              = new(-5.0f, 0.0f, 0.0f);
+            framesStill      = 1;
+
+            window = new(new VideoMode((uint)w, (uint)h), "Ray tracing", Styles.Titlebar | Styles.Close);
             window.SetFramerateLimit(60);
             window.SetMouseCursorVisible(false);
 
-            RenderTexture firstTexture       = new((uint)w, (uint)h);
-            Sprite firstTextureSprite        = new(firstTexture.Texture);
-            Sprite firstTextureSpriteFlipped = new(firstTexture.Texture) { Scale = new Vector2f(1, -1), Position = new Vector2f(0, h) };
+            firstTexture = new((uint)w, (uint)h);
+            firstTextureSprite = new(firstTexture.Texture);
+            firstTextureSpriteFlipped = new(firstTexture.Texture) { Scale = new Vector2f(1, -1), Position = new Vector2f(0, h) };
 
-            RenderTexture outputTexture       = new((uint)w, (uint)h);
-            Sprite outputTextureSprite        = new(outputTexture.Texture);
-            Sprite outputTextureSpriteFlipped = new(firstTexture.Texture) { Scale = new Vector2f(1, -1), Position = new Vector2f(0, h) };
+            outputTexture = new((uint)w, (uint)h);
+            outputTextureSprite = new(outputTexture.Texture);
+            outputTextureSpriteFlipped = new(firstTexture.Texture) { Scale = new Vector2f(1, -1), Position = new Vector2f(0, h) };
 
-            Shader shader = new (null, null, "C:\\Users\\user\\_private\\_code\\client_AnotherWorld\\Another World\\OutputShader.frag");
+            shader = new(null, null, "C:\\Users\\user\\_private\\_code\\client_AnotherWorld\\Another World\\OutputShader.frag");
             shader.SetUniform("u_resolution", new Vector2f(w, h));
 
-            Random random = new();
+            random = new();
+            clock  = new();
+            wasdUD = new bool[6];
 
             window.Closed += (obj, eArgs) => window.Close();
             window.MouseMoved += (obj, eArgs) =>
@@ -63,28 +87,30 @@ namespace Another_World
                     window.SetMouseCursorVisible(true);
                     mouseHidden = false;
                 }
-                else if (eArgs.Code == Keyboard.Key.W     ) wasdUD[0] = true;
-                else if (eArgs.Code == Keyboard.Key.A     ) wasdUD[1] = true;
-                else if (eArgs.Code == Keyboard.Key.S     ) wasdUD[2] = true;
-                else if (eArgs.Code == Keyboard.Key.D     ) wasdUD[3] = true;
-                else if (eArgs.Code == Keyboard.Key.Space ) wasdUD[4] = true;
+                else if (eArgs.Code == Keyboard.Key.W) wasdUD[0] = true;
+                else if (eArgs.Code == Keyboard.Key.A) wasdUD[1] = true;
+                else if (eArgs.Code == Keyboard.Key.S) wasdUD[2] = true;
+                else if (eArgs.Code == Keyboard.Key.D) wasdUD[3] = true;
+                else if (eArgs.Code == Keyboard.Key.Space) wasdUD[4] = true;
                 else if (eArgs.Code == Keyboard.Key.LShift) wasdUD[5] = true;
             };
             window.KeyReleased += (obj, eArgs) =>
             {
-                     if (eArgs.Code == Keyboard.Key.W     ) wasdUD[0] = false;
-                else if (eArgs.Code == Keyboard.Key.A     ) wasdUD[1] = false;
-                else if (eArgs.Code == Keyboard.Key.S     ) wasdUD[2] = false;
-                else if (eArgs.Code == Keyboard.Key.D     ) wasdUD[3] = false;
-                else if (eArgs.Code == Keyboard.Key.Space ) wasdUD[4] = false;
+                if (eArgs.Code == Keyboard.Key.W) wasdUD[0] = false;
+                else if (eArgs.Code == Keyboard.Key.A) wasdUD[1] = false;
+                else if (eArgs.Code == Keyboard.Key.S) wasdUD[2] = false;
+                else if (eArgs.Code == Keyboard.Key.D) wasdUD[3] = false;
+                else if (eArgs.Code == Keyboard.Key.Space) wasdUD[4] = false;
                 else if (eArgs.Code == Keyboard.Key.LShift) wasdUD[5] = false;
             };
+        }
 
+        public static int Run(CancellationToken token)
+        {
             while (window.IsOpen)
             {
                 if (token.IsCancellationRequested) break;
-                window.DispatchEvents();
-
+                /*
                 if (mouseHidden)
                 {
                     float mx = ((float)mouseX / w - 0.5f) * mouseSensitivity;
@@ -128,22 +154,40 @@ namespace Another_World
                 if (framesStill % 2 == 1)
                 {
                     shader.SetUniform("u_sample", firstTexture.Texture);
-                    RenderStates states = new() { Shader = shader };
-                    outputTexture.Draw(firstTextureSpriteFlipped, states);
+                    outputTexture.Draw(firstTextureSpriteFlipped, new RenderStates() { Shader = shader });
                     window.Draw(outputTextureSprite);
                 }
                 else
                 {
                     shader.SetUniform("u_sample", outputTexture.Texture);
-                    RenderStates states = new() { Shader = shader };
-                    firstTexture.Draw(outputTextureSpriteFlipped, states);
+                    firstTexture.Draw(outputTextureSpriteFlipped, new RenderStates() { Shader = shader });
                     window.Draw(firstTextureSprite);
                 }
+                */
+                
+                window.Clear(Color.White);
+                window.Draw(GetSimpleSprite());
 
                 window.Display();
                 framesStill++;
             }
             return 0;
+        }
+
+        private static Sprite GetSimpleSprite()
+        {
+            RenderTexture renderTexture = new(500, 500);
+
+            // drawing uses the same functions
+            renderTexture.Clear(Color.White);
+            renderTexture.Draw([
+                new Vertex(new(  0,   0), Color.Cyan),
+                new Vertex(new(500,   0), Color.Yellow),
+                new Vertex(new(250, 500), Color.Magenta)
+            ], PrimitiveType.TriangleFan);
+
+            // draw it to the window
+            return new Sprite(renderTexture.Texture);
         }
     }
 }

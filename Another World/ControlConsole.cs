@@ -3,28 +3,15 @@ using System.Runtime.InteropServices;
 
 namespace Another_World
 {
-    internal class ControlConsole
+    internal partial class ControlConsole
     {
-
-        [LibraryImport("user32.dll")]
-        static extern IntPtr GetConsoleWindow();
-
-        [LibraryImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        private const int SW_MINIMIZE = 6;
-
-        static void Main()
+        static void Main(string[] args)
         {
             CancellationToken token = new CancellationTokenSource().Token;
-#if DEBUG
-            Task memoryMonitorTask = MemoryUsageMonitor(token);
-#endif // DEBUG
             Task.Run(() => ControlMain.Run(token));
 
-            IntPtr handle = GetConsoleWindow();
-            ShowWindow(handle, SW_MINIMIZE);
+            Task memoryMonitorTask = Worker.MemoryUsageMonitor(token);
+            Worker.MinimizeWindow();
 
             string? input;
             do
@@ -34,40 +21,68 @@ namespace Another_World
             while (input != "q");
         }
 
-#if DEBUG
-#pragma warning disable CA1416
         /// <summary>
-        /// Checks memory overflow<br/>
-        /// Uses token when memory over 80%<br/>
-        /// Kills application when memory over 90%
+        /// Wrap for uncommon methods
         /// </summary>
-        /// <remarks>only for Windows</remarks>
-        /// <param name="token">Token for linked process on memory overcap</param>
-        /// <returns></returns>
-        static async Task MemoryUsageMonitor(CancellationToken token)
+        internal static partial class Worker
         {
-            PerformanceCounter ramCounter = new("Memory", "Available MBytes");
-            const float totalMemory = 1024 * 32;
-
-            while (!token.IsCancellationRequested)
+            /// <summary>
+            /// Checks memory overflow<br/>
+            /// Uses token when memory over 80%<br/>
+            /// Kills application when memory over 90%
+            /// </summary>
+            /// <remarks>Windows only<br\>
+            /// Debug only</remarks>
+            /// <param name="token">Token for linked process at memory overcap</param>
+            /// <returns></returns>
+            public static async Task MemoryUsageMonitor(CancellationToken token)
             {
-                float availableMemory = ramCounter.NextValue();
-                float usedMemoryPercentage = ((totalMemory - availableMemory) / totalMemory) * 100;
+#if WINDOWS && DEBUG
+                PerformanceCounter ramCounter = new("Memory", "Available MBytes");
+                const float totalMemory = 1024 * 32;
 
-                if (usedMemoryPercentage > 80)
+                while (!token.IsCancellationRequested)
                 {
-                    Console.WriteLine("Использование памяти превышает 80%. Отмена задачи...");
-                    token.ThrowIfCancellationRequested();
-                }
-                if (usedMemoryPercentage > 90)
-                {
-                    Environment.Exit(1);
-                }
+                    float availableMemory = ramCounter.NextValue();
+                    float usedMemoryPercentage = ((totalMemory - availableMemory) / totalMemory) * 100;
 
-                await Task.Delay(5000, CancellationToken.None);
+                    if (usedMemoryPercentage > 80)
+                    {
+                        Console.WriteLine("Использование памяти превышает 80%. Отмена задачи...");
+                        token.ThrowIfCancellationRequested();
+                    }
+                    if (usedMemoryPercentage > 90)
+                    {
+                        Environment.Exit(1);
+                    }
+
+                    await Task.Delay(5000, CancellationToken.None);
+                }
+#else
+                Console.WriteLine($"{nameof(MemoryUsageMonitor)} - DeBug & Windows only");
+#endif // WINDOWS && DEBUG
+            }
+
+            /// <summary>
+            /// Minimizes current console window
+            /// </summary>
+            public static void MinimizeWindow()
+            {
+#if WINDOWS
+                [DllImport("kernel32.dll")]
+                static extern IntPtr GetConsoleWindow();
+
+                [DllImport("user32.dll")]
+                [return: MarshalAs(UnmanagedType.Bool)]
+                static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+                const int SW_MINIMIZE = 6;
+                IntPtr handle = GetConsoleWindow();
+                ShowWindow(handle, SW_MINIMIZE);
+#else
+                Console.WriteLine("The current OS is not supported yet");
+#endif // WINDOWS
             }
         }
-#pragma warning restore
-#endif // DEBUG
     }
 }
