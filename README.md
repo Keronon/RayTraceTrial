@@ -1,2 +1,13 @@
 # client_AnotherWorld
- repo to hold main process project
+
+Данный репозиторий содержит проект .Net с реализацией __RayTracing__-системы отображения
+
+Использована библиотека __SFML__ для отображения окна
+
+Использована обработка сцены видеокартой через объект __Shader__
+
+Приложение является портом на .Net следующей разработки: [repository](https://github.com/ArtemOnigiri/RealTimeRayTracing)
+
+<hr/>
+
+<sub>_. . . большие планы. не самая удачная реализация . . ._</sub>
