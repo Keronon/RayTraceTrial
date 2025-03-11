@@ -1,17 +1,18 @@
 #version 130
 
-uniform vec2 u_resolution;
-uniform vec2 u_mouse;
-uniform vec3 u_pos;
-uniform float u_time;
+uniform vec2      u_resolution;
+uniform vec2      u_mouse;
+uniform vec3      u_pos;
+uniform float     u_time;
 uniform sampler2D u_sample;
-uniform float u_sample_part;
-uniform vec2 u_seed1;
-uniform vec2 u_seed2;
+uniform float     u_sample_part;
+uniform sampler2D u_skybox;
+uniform vec2      u_seed1;
+uniform vec2      u_seed2;
 
 const float MAX_DIST = 99999.0;
 const int MAX_REF = 8;
-vec3 light = normalize(vec3(-0.5, 0.75, -1.0));
+vec3 sunPos = normalize(vec3(0.17, -0.7, -1.0)); // at circle , at radius , at side
 
 uvec4 R_STATE;
 
@@ -71,11 +72,11 @@ vec2 sphIntersect(in vec3 ro, in vec3 rd, float ra) {
 }
 
 vec2 boxIntersection(in vec3 ro, in vec3 rd, in vec3 rad, out vec3 oN)  {
-	vec3 m = 1.0 / rd;
-	vec3 n = m * ro;
-	vec3 k = abs(m) * rad;
-	vec3 t1 = -n - k;
-	vec3 t2 = -n + k;
+	vec3  m  = 1.0 / rd;
+	vec3  n  = m * ro;
+	vec3  k  = abs(m) * rad;
+	vec3  t1 = -n - k;
+	vec3  t2 = -n + k;
 	float tN = max(max(t1.x, t1.y), t1.z);
 	float tF = min(min(t2.x, t2.y), t2.z);
 	if(tN > tF || tF < 0.0) return vec2(-1.0);
@@ -88,10 +89,13 @@ float plaIntersect(in vec3 ro, in vec3 rd, in vec4 p) {
 }
 
 vec3 getSky(vec3 rd) {
-	vec3 col = vec3(0.3, 0.6, 1.0);
-	vec3 sun = vec3(0.95, 0.9, 1.0);
-	sun *= max(0.0, pow(dot(rd, light), 256.0));
-	col *= max(0.0, dot(light, vec3(0.0, 0.0, -1.0)));
+	vec2 uv   = vec2(atan(rd.x, rd.y), asin(rd.z) * 2.0);
+	     uv  /= 3.14159265;
+	     uv   = uv * 0.5 + 0.5;
+	vec3 col  = texture(u_skybox, uv).rgb;
+	vec3 sun  = vec3(0.95, 0.9, 1.0);
+	     sun *= max(0.0, pow(dot(rd, sunPos), /*size*/4000.0));
+	     col *= max(0.0, dot(sunPos, vec3(0.0, 0.0, -1.0)));
 	return clamp(sun + col * 0.01, 0.0, 1.0);
 }
 

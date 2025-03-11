@@ -8,8 +8,23 @@ namespace Another_World
     {
         private ControlMain() { }
 
-        private const int w = 1920;
-        private const int h = 1080;
+        private const string windowTitle  = "Another World";
+        private const string outputShader = "../../../OutputShader.frag";
+        private const string panorama     = "../../../Panorama.jpg";
+
+        private const string u_resolution  = "u_resolution"; 
+        private const string u_skybox      = "u_skybox";     
+        private const string u_pos         = "u_pos";        
+        private const string u_mouse       = "u_mouse";      
+        private const string u_time        = "u_time";       
+        private const string u_sample_part = "u_sample_part";
+        private const string u_seed1       = "u_seed1";      
+        private const string u_seed2       = "u_seed2";
+        private const string u_sample      = "u_sample";     
+
+        private static VideoMode videoMode;
+        private static int w;
+        private static int h;
 
         private static int      mouseX;
         private static int      mouseY;
@@ -26,14 +41,18 @@ namespace Another_World
         private static Sprite        outputTextureSprite;
         private static Sprite        outputTextureSpriteFlipped;
 
-        private static readonly bool[] wasdUD;
-        private static readonly Clock clock;
+        private static readonly bool[]       wasdUD;
+        private static readonly Clock        clock;
         private static readonly RenderWindow window;
-        private static readonly Shader shader;
-        private static readonly Random random;
+        private static readonly Shader       shader;
+        private static readonly Random       random;
 
         static ControlMain()
         {
+            videoMode = new(VideoMode.DesktopMode.Width / 2, VideoMode.DesktopMode.Height / 2);
+            w = (int)videoMode.Width;
+            h = (int)videoMode.Height;
+
             mouseX           = w / 2;
             mouseY           = h / 2;
             mouseHidden      = true;
@@ -42,7 +61,7 @@ namespace Another_World
             pos              = new(-5.0f, 0.0f, 0.0f);
             framesStill      = 1;
 
-            window = new(new VideoMode((uint)w, (uint)h), "Ray tracing", Styles.Titlebar | Styles.Close);
+            window = new(videoMode, windowTitle, Styles.Titlebar | Styles.Close);
             window.SetFramerateLimit(60);
             window.SetMouseCursorVisible(false);
 
@@ -54,8 +73,9 @@ namespace Another_World
             outputTextureSprite = new(outputTexture.Texture);
             outputTextureSpriteFlipped = new(firstTexture.Texture) { Scale = new Vector2f(1, -1), Position = new Vector2f(0, h) };
 
-            shader = new(null, null, "C:\\Users\\user\\_private\\_code\\client_AnotherWorld\\Another World\\OutputShader.frag");
-            shader.SetUniform("u_resolution", new Vector2f(w, h));
+            shader = new(null, null, outputShader);
+            shader.SetUniform(u_resolution, new Vector2f(w, h));
+            shader.SetUniform(u_skybox    , new Texture(panorama));
 
             random = new();
             clock  = new();
@@ -66,8 +86,8 @@ namespace Another_World
             {
                 if (mouseHidden)
                 {
-                    int mx = (int)eArgs.X - w / 2;
-                    int my = (int)eArgs.Y - h / 2;
+                    int mx = eArgs.X - w / 2;
+                    int my = eArgs.Y - h / 2;
                     mouseX += mx;
                     mouseY += my;
                     Mouse.SetPosition(new Vector2i(w / 2, h / 2), window);
@@ -87,20 +107,20 @@ namespace Another_World
                     window.SetMouseCursorVisible(true);
                     mouseHidden = false;
                 }
-                else if (eArgs.Code == Keyboard.Key.W) wasdUD[0] = true;
-                else if (eArgs.Code == Keyboard.Key.A) wasdUD[1] = true;
-                else if (eArgs.Code == Keyboard.Key.S) wasdUD[2] = true;
-                else if (eArgs.Code == Keyboard.Key.D) wasdUD[3] = true;
-                else if (eArgs.Code == Keyboard.Key.Space) wasdUD[4] = true;
+                else if (eArgs.Code == Keyboard.Key.W     ) wasdUD[0] = true;
+                else if (eArgs.Code == Keyboard.Key.A     ) wasdUD[1] = true;
+                else if (eArgs.Code == Keyboard.Key.S     ) wasdUD[2] = true;
+                else if (eArgs.Code == Keyboard.Key.D     ) wasdUD[3] = true;
+                else if (eArgs.Code == Keyboard.Key.Space ) wasdUD[4] = true;
                 else if (eArgs.Code == Keyboard.Key.LShift) wasdUD[5] = true;
             };
             window.KeyReleased += (obj, eArgs) =>
             {
-                if (eArgs.Code == Keyboard.Key.W) wasdUD[0] = false;
-                else if (eArgs.Code == Keyboard.Key.A) wasdUD[1] = false;
-                else if (eArgs.Code == Keyboard.Key.S) wasdUD[2] = false;
-                else if (eArgs.Code == Keyboard.Key.D) wasdUD[3] = false;
-                else if (eArgs.Code == Keyboard.Key.Space) wasdUD[4] = false;
+                     if (eArgs.Code == Keyboard.Key.W     ) wasdUD[0] = false;
+                else if (eArgs.Code == Keyboard.Key.A     ) wasdUD[1] = false;
+                else if (eArgs.Code == Keyboard.Key.S     ) wasdUD[2] = false;
+                else if (eArgs.Code == Keyboard.Key.D     ) wasdUD[3] = false;
+                else if (eArgs.Code == Keyboard.Key.Space ) wasdUD[4] = false;
                 else if (eArgs.Code == Keyboard.Key.LShift) wasdUD[5] = false;
             };
         }
@@ -110,7 +130,8 @@ namespace Another_World
             while (window.IsOpen)
             {
                 if (token.IsCancellationRequested) break;
-                /*
+                window.DispatchEvents();
+
                 if (mouseHidden)
                 {
                     float mx = ((float)mouseX / w - 0.5f) * mouseSensitivity;
@@ -123,12 +144,12 @@ namespace Another_World
                          if (wasdUD[1]) dir += new Vector3f( 0.0f, -1.0f, 0.0f);
                     else if (wasdUD[3]) dir += new Vector3f( 0.0f,  1.0f, 0.0f);
 
-                    dirTemp.Z = dir.Z * (float)Math.Cos(-my) - dir.X * (float)Math.Sin(-my);
-                    dirTemp.X = dir.Z * (float)Math.Sin(-my) + dir.X * (float)Math.Cos(-my);
-                    dirTemp.Y = dir.Y;
-                    dir.X = dirTemp.X * (float)Math.Cos(mx) - dirTemp.Y * (float)Math.Sin(mx);
-                    dir.Y = dirTemp.X * (float)Math.Sin(mx) + dirTemp.Y * (float)Math.Cos(mx);
-                    dir.Z = dirTemp.Z;
+                    dirTemp.Z = dir    .Z * (float)Math.Cos(-my) - dir    .X * (float)Math.Sin(-my);
+                    dirTemp.X = dir    .Z * (float)Math.Sin(-my) + dir    .X * (float)Math.Cos(-my);
+                    dirTemp.Y = dir    .Y;
+                    dir    .X = dirTemp.X * (float)Math.Cos( mx) - dirTemp.Y * (float)Math.Sin( mx);
+                    dir    .Y = dirTemp.X * (float)Math.Sin( mx) + dirTemp.Y * (float)Math.Cos( mx);
+                    dir    .Z = dirTemp.Z;
                     pos += dir * speed;
 
                          if (wasdUD[4]) pos.Z -= speed;
@@ -143,30 +164,26 @@ namespace Another_World
                         }
                     }
 
-                    shader.SetUniform("u_pos", pos);
-                    shader.SetUniform("u_mouse", new Vector2f(mx, my));
-                    shader.SetUniform("u_time", clock.ElapsedTime.AsSeconds());
-                    shader.SetUniform("u_sample_part", 1.0f / framesStill);
-                    shader.SetUniform("u_seed1", new Vector2f((float)random.NextDouble(), (float)random.NextDouble()) * 999.0f);
-                    shader.SetUniform("u_seed2", new Vector2f((float)random.NextDouble(), (float)random.NextDouble()) * 999.0f);
+                    shader.SetUniform(u_pos        , pos);
+                    shader.SetUniform(u_mouse      , new Vector2f(mx, my));
+                    shader.SetUniform(u_time       , clock.ElapsedTime.AsSeconds());
+                    shader.SetUniform(u_sample_part, 1.0f / framesStill);
+                    shader.SetUniform(u_seed1      , new Vector2f((float)random.NextDouble(), (float)random.NextDouble()) * 999.0f);
+                    shader.SetUniform(u_seed2      , new Vector2f((float)random.NextDouble(), (float)random.NextDouble()) * 999.0f);
                 }
 
                 if (framesStill % 2 == 1)
                 {
-                    shader.SetUniform("u_sample", firstTexture.Texture);
-                    outputTexture.Draw(firstTextureSpriteFlipped, new RenderStates() { Shader = shader });
+                    shader.SetUniform(u_sample, firstTexture.Texture);
+                    outputTexture.Draw(firstTextureSpriteFlipped, new RenderStates(shader));
                     window.Draw(outputTextureSprite);
                 }
                 else
                 {
-                    shader.SetUniform("u_sample", outputTexture.Texture);
-                    firstTexture.Draw(outputTextureSpriteFlipped, new RenderStates() { Shader = shader });
+                    shader.SetUniform(u_sample, outputTexture.Texture);
+                    firstTexture.Draw(outputTextureSpriteFlipped, new RenderStates(shader));
                     window.Draw(firstTextureSprite);
                 }
-                */
-                
-                window.Clear(Color.White);
-                window.Draw(GetSimpleSprite());
 
                 window.Display();
                 framesStill++;
@@ -174,16 +191,16 @@ namespace Another_World
             return 0;
         }
 
-        private static Sprite GetSimpleSprite()
+        private static Sprite GetSimpleSprite(uint w, uint h)
         {
-            RenderTexture renderTexture = new(500, 500);
+            RenderTexture renderTexture = new(w, h);
 
             // drawing uses the same functions
             renderTexture.Clear(Color.White);
             renderTexture.Draw([
-                new Vertex(new(  0,   0), Color.Cyan),
-                new Vertex(new(500,   0), Color.Yellow),
-                new Vertex(new(250, 500), Color.Magenta)
+                new Vertex(new(0    , 0), Color.Cyan),
+                new Vertex(new(w    , 0), Color.Magenta),
+                new Vertex(new(w / 2, h), Color.Yellow)
             ], PrimitiveType.TriangleFan);
 
             // draw it to the window
